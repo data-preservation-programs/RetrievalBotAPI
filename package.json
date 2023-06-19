@@ -1,0 +1,18 @@
+{
+  "name": "@data-preservation-programs/RetrievalBotAPI",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "release": "rm -rf dist && npm run build && cp package*.json dist && cd dist && npm ci --omit=dev && zip -r index.zip ."
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.109",
+    "@types/node": "^18.11.9",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "mongodb": "^5.6.0"
+  }
+}
