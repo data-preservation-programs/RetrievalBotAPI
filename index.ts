@@ -14,6 +14,7 @@ interface resultRow {
 export async function handler(event: APIGatewayProxyEventV2, _: Context): Promise<APIGatewayProxyResult> {
   const token = event.queryStringParameters?.["token"]
   const client = event.queryStringParameters?.["client"]
+  const provider = event.queryStringParameters?.["provider"]
   const date = event.queryStringParameters?.["date"]
   if (token !== process.env.TOKEN) {
     return {
@@ -21,10 +22,16 @@ export async function handler(event: APIGatewayProxyEventV2, _: Context): Promis
       body: "Unauthorized"
     }
   }
-  if (client == undefined) {
+  if (client == undefined && provider == undefined) {
     return {
       statusCode: 400,
-      body: "client is required"
+      body: "client or provider is required"
+    }
+  }
+  if (client != undefined && provider != undefined) {
+    return {
+      statusCode: 400,
+      body: "provide either client or provider, not both"
     }
   }
   if (date == undefined) {
@@ -34,17 +41,24 @@ export async function handler(event: APIGatewayProxyEventV2, _: Context): Promis
     }
   }
 
+  const match: any = {
+    'task.requester': 'filplus',
+    'created_at': {
+      $gte: new Date(date),
+      $lt: new Date(date + "T23:59:59.999Z")
+    }
+  }
+
+  if (client != undefined) {
+    match['task.metadata.client'] = client
+  }
+  if (provider != undefined) {
+    match['task.provider.id'] = provider
+  }
 
   const result: resultRow[] = await (mongo.db("prod").collection("task_result").aggregate([
     {
-      $match: {
-        'task.requester': 'filplus',
-        'task.metadata.client': client,
-        'created_at': {
-          $gte: new Date(date),
-          $lt: new Date(date + "T23:59:59.999Z")
-        }
-      }
+      $match: match
     }, {
       $group: {
         _id: {
