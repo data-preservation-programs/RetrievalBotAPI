@@ -8,7 +8,9 @@ interface resultRow {
     module: string,
     success: boolean
   },
-  count: number
+  count: number,
+  ttfb_p50: [number | null],
+  ttfb_p95: [number | null],
 }
 
 export async function handler(event: APIGatewayProxyEventV2, _: Context): Promise<APIGatewayProxyResult> {
@@ -66,30 +68,50 @@ export async function handler(event: APIGatewayProxyEventV2, _: Context): Promis
           success: "$result.success"
         },
         count: {$sum: 1},
+        ttfb_p50: {
+          $percentile: {
+            input: "$result.ttfb",
+            p: [0.5],
+            method: 'approximate'
+          }
+        },
+        ttfb_p95: {
+          $percentile: {
+            input: "$result.ttfb",
+            p: [0.95],
+            method: 'approximate'
+          }
+        },
       },
     }
   ])).toArray() as resultRow[]
 
-  const resultByModule = new Map<string, { total: number, success: number }>()
+  const resultByModule = new Map<string, { total: number, success: number, ttfb_p50: number | null, ttfb_p95: number | null }>()
   for (const row of result) {
     const module = row._id.module
     const success = row._id.success
     const count = row.count
+    const ttfb_p50 = row.ttfb_p50[0]
+    const ttfb_p95 = row.ttfb_p95[0]
     if (!resultByModule.has(module)) {
-      resultByModule.set(module, {total: 0, success: 0})
+      resultByModule.set(module, {total: 0, success: 0, ttfb_p50: null, ttfb_p95: null})
     }
     const moduleResult = resultByModule.get(module)!
     moduleResult.total += count
     if (success) {
       moduleResult.success += count
+      moduleResult.ttfb_p50 = ttfb_p50
+      moduleResult.ttfb_p95 = ttfb_p95
     }
   }
 
-  const resultByModuleArray = Array.from(resultByModule.entries()).map(([module, {total, success}]) => {
+  const resultByModuleArray = Array.from(resultByModule.entries()).map(([module, {total, success, ttfb_p50, ttfb_p95}]) => {
     return {
       module,
       total,
       success,
+      ttfb_p50,
+      ttfb_p95
     }
   })
   return {
